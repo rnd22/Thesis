@@ -1,0 +1,49 @@
+% Load data from a CSV file
+filePath = fullfile('MountainMintDirect', '325.csv'); % Replace with the actual file name
+data = readtable(filePath);
+
+% Extract the necessary columns
+originalSignal = data.strength;
+originalSignal(1:10) = mean(originalSignal(10:end));
+
+timestamp = data.timestamp;
+timestamp = (timestamp - timestamp(1)) * 1e-9;
+
+% Calculate sampling frequency
+Fs = 1 / mode(diff(timestamp));
+
+% Plot the original signal
+figure;
+plot(timestamp, originalSignal);
+xlabel('Time (seconds)');
+ylabel('Signal Amplitude');
+title('Original Signal');
+grid on;
+
+% Apply a high-pass Butterworth filter
+order = 5;
+cutoffFreq = 3 / (Fs / 2);
+[b, a] = butter(order, cutoffFreq, 'high');
+filteredSignal = filtfilt(b, a, originalSignal - mean(originalSignal));
+
+% Plot the filtered signal
+hold on;
+plot(timestamp, filteredSignal);
+legend('Original Signal', 'Filtered Signal');
+hold off;
+
+% Visualize the absolute value of the filtered signal and threshold
+figure;
+plot(timestamp, abs(filteredSignal));
+xlabel('Time (seconds)');
+ylabel('Absolute Filtered Signal');
+title('Absolute Filtered Signal with Threshold');
+grid on;
+
+% Set the threshold for event detection
+n = 3;
+threshold = n * std(abs(filteredSignal));
+yline(threshold, '--', 'Threshold');
+
+% Detect events
+eventMarkers = zeros(1, length
