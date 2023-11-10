@@ -1,0 +1,81 @@
+import pandas as pd
+import numpy as np
+from scipy.signal import butter, filtfilt
+import matplotlib.pyplot as plt
+
+# Load data from a CSV file
+file_path = 'MountainMintDirect/325.csv'  # Replace with the actual file path
+data = pd.read_csv(file_path)
+
+# Extract the necessary columns
+original_signal = data['strength']
+original_signal[:10] = np.mean(original_signal[10:])
+
+timestamp = data['timestamp']
+timestamp = (timestamp - timestamp.iloc[0]) * 1e-9
+
+# Calculate sampling frequency
+Fs = 1 / np.median(np.diff(timestamp))
+
+# Plot the original signal
+plt.figure()
+plt.plot(timestamp, original_signal)
+plt.xlabel('Time (seconds)')
+plt.ylabel('Signal Amplitude')
+plt.title('Original Signal')
+plt.grid(True)
+
+# Apply a high-pass Butterworth filter
+order = 5
+cutoff_freq = 3 / (Fs / 2)
+b, a = butter(order, cutoff_freq, btype='high')
+filtered_signal = filtfilt(b, a, original_signal - np.mean(original_signal))
+
+# Plot the filtered signal
+plt.figure()
+plt.plot(timestamp, filtered_signal, label='Filtered Signal')
+plt.plot(timestamp, np.abs(filtered_signal), label='Absolute Filtered Signal')
+plt.xlabel('Time (seconds)')
+plt.ylabel('Signal Amplitude')
+plt.title('Filtered Signal and Absolute Filtered Signal with Threshold')
+plt.axhline(y=3 * np.std(np.abs(filtered_signal)), color='r', linestyle='--', label='Threshold')
+plt.legend()
+plt.grid(True)
+
+# Detect events
+event_markers = np.zeros_like(filtered_signal)
+event_markers[np.abs(filtered_signal) > 3 * np.std(np.abs(filtered_signal))] = 1
+event_markers = np.diff(event_markers)
+
+# Extract and plot samples around detected events
+start_idx = 0
+pre_time = 0.2  # seconds
+post_time = 0.3  # seconds
+out_idx = 0
+samples = []
+
+while start_idx < len(filtered_signal):
+    cur_idx = np.argmax(event_markers[start_idx:] == 1)
+
+    if cur_idx > 0:
+        start_sample = start_idx + cur_idx - round(pre_time * Fs)
+        end_sample = start_idx + cur_idx + round(post_time * Fs)
+
+        if start_sample > 0 and end_sample < len(filtered_signal):
+            samples.append(filtered_signal[start_sample:end_sample])
+            out_idx += 1
+            start_idx = end_sample
+        else:
+            break
+    else:
+        break
+
+# Visualize extracted samples
+plt.figure()
+for j in range(min(5, len(samples))):
+    plt.plot(samples[j])
+plt.xlabel('Time (samples)')
+plt.ylabel('Amplitude')
+plt.title('Extracted Samples')
+plt.grid(True)
+plt.show()
