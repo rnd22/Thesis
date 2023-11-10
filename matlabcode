@@ -1,0 +1,75 @@
+% Load data from a specific CSV file
+filePath = fullfile('MountainMintDirect', '325.csv'); % Replace with the actual file name
+data = readtable(filePath);
+
+% Extract the necessary columns (replace 'strength' with your column name)
+signal = data.strength;
+signal(1:10) = mean(signal(10:end));
+timestamp = data.timestamp;
+timestamp = timestamp - timestamp(1);
+
+
+% Assuming the data is sampled at a specific frequency (Fs)
+Fs = 1.051e-06; % Replace with your actual sampling frequency
+
+%Convert from nanoseconds (?)
+timestamp = timestamp * 1e-9 ; 
+
+%intv to sampling freq
+Fs = 1/(mode(diff(timestamp)));
+timestamp = timestamp + 1/Fs;
+
+% Plot the signal
+figure;
+% plot(timestamp, signal);
+xlabel('Time (seconds)');
+ylabel('Signal Amplitude');
+title('Signal Plot');
+grid on;
+
+% Set the lower limit of the y-axis to 12000
+%ylim([12000, max(signal)]); % Adjust the upper limit as needed
+
+%% filter stuff
+
+ord = 5;
+Wn = 3/(Fs/2);
+[b,a] = butter(ord,Wn,"high");
+FilteredDataAgain = filtfilt(b,a,signal-mean(signal));
+hold on
+plot(timestamp, FilteredDataAgain);
+
+absFilt = abs(FilteredDataAgain); 
+plot(timestamp,absFilt);
+
+n = 3;
+threshold = n * std(absFilt);
+yline (threshold);
+
+z = zeros(1,length(absFilt));
+z(absFilt > threshold) = 1;
+z = diff(z);
+
+%find command to find events
+startidx = 1;
+pretim = 0.2; %seconds
+posttim = 0.3;  %seconds
+
+outidx = 1;
+while startidx < length(FilteredDataAgain)
+curidx = find(z(startidx:end) == 1,1,"first"); %recursive
+if exist("curidx","var") 
+ startsample = (curidx + startidx) - round(pretim * Fs);
+ endsample = (curidx + startidx) + round(posttim * Fs);
+ if startsample > 0 && endsample < length(FilteredDataAgain)
+ samples(outidx,:) = FilteredDataAgain(startsample:endsample);
+ outidx = outidx + 1;
+ startidx = endsample;
+ end
+end
+
+
+end 
+
+%% run this in the command window 
+% figure(2); clf; hold on; for j=1:5; plot(samples(j,:)); end
